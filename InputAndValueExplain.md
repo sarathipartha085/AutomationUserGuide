@@ -1,87 +1,96 @@
+## 🔧 Input Field IDs and Values (`!!`, `!`, `*`, `@`, `$`)
 
-## Input Field IDs and Values (`!`, `*`, `@`, `$`)
+This system supports **special character prefixes** to dynamically control input behavior. These prefixes apply to either the **input field ID** (`idKey`) or the **value**, and they are processed in the following **strict order**:
 
-This system supports **special character prefixes** to modify behavior dynamically. These prefixes apply either to the **input field ID** or the **input value** and are interpreted in this strict order:
-
-> **Order of Evaluation:** `!` → `*` → `@` → `$`
-
----
-
-### Prefixes on Input Field ID (`idKey`)
-
-| Prefix | Description                                                                                                                        |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `!`    | **Skip post-input validation**. Prevents validation of the value after entering it.                                                |
-| `*`    | **Press Enter** after entering the value instead of the default Tab key. Useful for triggering autocomplete or instant validation. |
-
-You can **combine** these prefixes:
-
-* `!*elementId`
-* `*elementId`
-* `!elementId`
+> 🧠 **Order of Evaluation:** `!!` → `!` → `*` → `@` → `$`
 
 ---
 
-### Prefixes on Input Value (`value`)
+### 🔹 Prefixes on Input Field ID (`idKey`)
 
-| Prefix | Description                                                                                                      |
-| ------ | ---------------------------------------------------------------------------------------------------------------- |
-| `@`    | **Fetch value from the database** using a configured SQL query key. Value is also stored into `ScenarioContext`. |
-| `$`    | **Retrieve value from ScenarioContext**. Useful for using previously saved values.                               |
+| Prefix | Description                                                                                                                           |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `!!`   | **Make the step optional**. If any error occurs, the step will be skipped and test will continue. *(Used mostly for fragile inputs.)* |
+| `!`    | **Skip post-input validation**. Prevents validation of the value after entering it.                                                   |
+| `*`    | **Press Enter** after entering the value instead of the default Tab key. Useful for triggering autocomplete or instant validation.    |
+
+✅ These can be **combined** in this order:
+`!!`, `!`, `*`
+
+#### ➕ Examples of Combinations:
+
+| ID Key Input   | Behavior                                  |
+| -------------- |-------------------------------------------|
+| `*searchBox`   | Press `Enter` after entering the value    |
+| `!!*searchBox` | Optional step + press Enter               |
+| `!*fieldId`    | Skip validation + press Enter             |
+| `!!*fieldId`   | Optional + skip validation + press Enter  |
+| `!fieldId`     | Skip validation only                      |
 
 ---
 
-## ✅ Evaluation Sequence
+### 🔹 Prefixes on Input Value (`value`)
 
-Here's how the step processes both ID and value in exact order:
+| Prefix | Description                                                                                                   |
+| ------ | ------------------------------------------------------------------------------------------------------------- |
+| `@`    | **Fetch value from the database** using a configured SQL query key. The result is saved to `ScenarioContext`. |
+| `$`    | **Retrieve value from ScenarioContext** (usually from a previously saved step or DB value).                   |
 
-1. **`!`** – If present on `idKey`, disable validation after entering value.
-2. **`*`** – If present on `idKey`, press `Enter` after input instead of `Tab`.
-3. **`@`** – If present on `value`, run DB query (from config) and store the result.
-4. **`$`** – If present on `value`, retrieve value from `ScenarioContext`.
+---
+
+## ✅ Evaluation Sequence (Full Order)
+
+| Step | Prefix | Applies To | Action                                                                        |
+| ---- | ------ | ---------- | ----------------------------------------------------------------------------- |
+| 1️⃣  | `!!`   | `idKey`    | Make the step optional. Any errors will be caught and logged; test continues. |
+| 2️⃣  | `!`    | `idKey`    | Skip validation after input                                                   |
+| 3️⃣  | `*`    | `idKey`    | Press `Enter` after input instead of default `Tab`                            |
+| 4️⃣  | `@`    | `value`    | Fetch from DB using config key and save to `ScenarioContext`                  |
+| 5️⃣  | `$`    | `value`    | Pull from `ScenarioContext`                                                   |
 
 ---
 
 ## 💡 Examples
 
-### ✔️ Full Combination (Skip validation, press Enter, DB lookup)
+### ✔️ Full Combination (Optional + Skip Validation + Press Enter + Context)
 
 ```gherkin
-    And User enters value "$IIS.chargesCode" into input with id "!*trsChargesListGridTbl_Id_M08MT_gs_trsCHARGESVO.CODE" where label is "Charge code"
+And User enters value "$IIS.chargeCode" into input with id "!!*trsChargesListGridTbl_Id_M08MT_gs_trsCHARGESVO.CODE" where label is "Charge Code"
 ```
 
-* `!` → skip validation
-* `*` → press Enter
-* `@latestCustomerId` → fetch value from DB
-* Final ID: `customer_id_input`
+| Prefix | Meaning                                               |
+| ------ | ----------------------------------------------------- |
+| `!!`   | Step is optional                                      |
+| `*`    | Press Enter after value is entered                    |
+| `$`    | Fetch from `ScenarioContext` (key = `IIS.chargeCode`) |
 
 ---
 
-### ✔️ Use Context Variable
+### ✔️ Use Value from Context Only
 
 ```gherkin
 And User enters value "$dealNumber" into input with id "deal_input" where label is "Deal No"
 ```
 
-* Pulls value from ScenarioContext with key `dealNumber`
+* Retrieves value stored as `dealNumber` earlier in the test
 
 ---
 
-### ✔️ Trigger Enter Only
+### ✔️ Use Database Result as Input
 
 ```gherkin
-And User enters value "12345" into input with id "*searchBox" where label is "Search"
+And User enters value "@latestCustomerId" into input with id "customer_id" where label is "Customer"
 ```
 
-* Inputs value and presses Enter
-* Then moves forward without validation skipping
+* Runs configured SQL and stores value as `latestCustomerId` in ScenarioContext
 
 ---
 
-### ✔️ Skip Validation Only
+### ✔️ Optional Field Entry Only
 
 ```gherkin
-And User enters value "Optional" into input with id "!optionalField" where label is "Optional Field"
+And User enters value "Optional123" into input with id "!!optionalField" where label is "Optional Field"
 ```
 
-* No validation occurs after input
+* If the field is missing or input fails, the step is logged and skipped
+
